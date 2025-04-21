@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anotador de Imagens Web</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <input type="file" id="imageInput"
+           accept="image/jpeg, image/png, image/gif, image/bmp, image/tiff, image/webp, image/*"
+           multiple style="display: none;">
+    <input type="file" id="annotationInput" accept=".xml" multiple style="display: none;">
+
+    <div class="toolbar">
+        <div class="toolbar-group">
+            <button id="openImageBtn">Abrir/Substituir Imagens</button>
+            <button id="addImageBtn">Adicionar Imagens</button>
+            <button id="loadAnnotationsBtn">Carregar Anotações (XML)</button>
+        </div>
+        <div class="toolbar-group">
+            <button id="prevImageBtn" disabled>&lt; Anterior</button>
+            <span id="imageInfo">Sem Imagem</span>
+            <button id="nextImageBtn" disabled>Próxima &gt;</button>
+        </div>
+        <div class="toolbar-group">
+            <button id="zoomOutBtn" disabled>-</button>
+            <span>Zoom</span>
+            <button id="zoomInBtn" disabled>+</button>
+        </div>
+        <div class="toolbar-group">
+            <button id="saveAnnotationsBtn">Salvar Anotações (YOLO)</button>
+             <label for="cropFormatSelect" style="margin-left: 10px;">Formato Crop:</label>
+             <select id="cropFormatSelect" style="padding: 5px;">
+                 <option value="png" selected>PNG</option>
+                 <option value="jpeg">JPEG</option>
+                 <option value="webp">WEBP</option>
+                 <option value="bmp">BMP</option>
+                 <option value="gif">GIF</option>
+             </select>
+            <button id="saveCropsBtn">Salvar Seções (Crops)</button>
+            <button id="deleteBtn" class="danger" disabled>Deletar Selecionada</button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <h3>Ferramentas</h3>
+            <button id="drawModeBtn" disabled>Desenhar Caixa [OFF]</button>
+            <label for="classSelect">Classe Atual:</label>
+            <select id="classSelect" disabled>
+                </select>
+            <div id="annotationList">
+                <h4>Anotações nesta Imagem:</h4>
+                <ul id="currentAnnotations">
+                    <li>Carregue uma imagem.</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="canvas-container" id="canvasContainer">
+            <canvas id="annotationCanvas"></canvas>
+        </div>
+    </div>
+
+    <div class="status-bar" id="statusBar">Pronto</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="script.js"></script>
+</body>
+</html>

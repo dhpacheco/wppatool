@@ -1,0 +1,172 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden; /* Prevent body scrollbars */
+}
+
+.toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+    background-color: #f0f0f0;
+    border-bottom: 1px solid #ccc;
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    margin: 2px 5px; /* Add some margin for wrapped groups */
+}
+
+.toolbar button, .sidebar button, .sidebar select, .toolbar select, .toolbar label { /* Added toolbar select/label */
+    padding: 5px 10px;
+    margin: 0 3px;
+    cursor: pointer;
+    font-size: 0.9em; /* Consistent font size */
+}
+
+
+.toolbar button:disabled, .toolbar select:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.toolbar span {
+    margin: 0 5px;
+    font-size: 0.9em;
+}
+
+#imageInfo {
+    min-width: 150px; /* Prevent layout shifts, slightly wider */
+    text-align: center;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+.main-container {
+    display: flex;
+    flex-grow: 1; /* Take remaining height */
+    overflow: hidden; /* Prevent container scroll */
+}
+
+.sidebar {
+    width: 220px; /* Slightly wider */
+    padding: 15px;
+    border-right: 1px solid #ccc;
+    background-color: #f8f8f8;
+    overflow-y: auto; /* Scroll if content overflows */
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar h3, .sidebar h4 {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+.sidebar label {
+    display: block;
+    margin-top: 15px;
+    margin-bottom: 3px;
+    font-size: 0.9em;
+}
+.sidebar select, .sidebar button#drawModeBtn {
+    width: 100%;
+    box-sizing: border-box; /* Include padding/border in width */
+    margin-bottom: 5px; /* Spacing below buttons/selects */
+}
+#drawModeBtn.active {
+    background-color: #d4edda; /* Light green */
+    border-color: #c3e6cb;
+    font-weight: bold;
+    color: #155724;
+}
+
+#annotationList {
+    margin-top: 20px;
+    flex-grow: 1; /* Allow list to take space */
+    overflow-y: auto; /* Scroll list if needed */
+    border-top: 1px solid #eee; /* Separator */
+    padding-top: 10px;
+}
+#currentAnnotations {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    font-size: 0.85em;
+}
+#currentAnnotations li {
+    padding: 5px 8px; /* Slightly more padding */
+    border-bottom: 1px dashed #eee;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center; /* Align items vertically */
+    word-break: break-all; /* Prevent long names overflowing */
+}
+#currentAnnotations li:hover {
+    background-color: #e9ecef; /* Lighter hover */
+}
+#currentAnnotations li.selected {
+    background-color: #cfe2ff;
+    font-weight: bold;
+    border-left: 3px solid #0d6efd; /* Indicate selection more clearly */
+    padding-left: 5px; /* Adjust padding for border */
+}
+#currentAnnotations li:last-child {
+    border-bottom: none; /* Remove border from last item */
+}
+
+
+.canvas-container {
+    flex-grow: 1; /* Take remaining width */
+    overflow: auto; /* Add scrollbars when canvas is larger */
+    background-color: #e9ecef; /* Slightly lighter background */
+    position: relative; /* Needed for absolute positioning if we add overlays */
+    display: flex; /* Center canvas if smaller */
+    justify-content: center;
+    align-items: center;
+}
+
+#annotationCanvas {
+    background-color: #fff; /* White background for canvas itself */
+    display: block; /* Remove extra space below */
+    cursor: default; /* Default cursor */
+    /* Cursors will be changed via JS */
+    image-rendering: pixelated; /* Keep pixels sharp when zoomed in */
+    /* image-rendering: crisp-edges; */ /* Alternative for sharp pixels */
+}
+
+.status-bar {
+    padding: 4px 10px;
+    background-color: #f0f0f0;
+    border-top: 1px solid #ccc;
+    font-size: 0.8em;
+    color: #555;
+    height: 22px; /* Fixed height */
+    line-height: 22px;
+    white-space: nowrap; /* Prevent wrapping */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Add ellipsis if text overflows */
+}
+
+button.danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+button.danger:hover {
+    background-color: #f1b0b7;
+    color: #721c24; /* Maintain text color on hover */
+    border-color: #eba3ac;
+}
+button.danger:disabled {
+    background-color: #f8d7da; /* Keep color when disabled */
+    border-color: #f5c6cb;
+    color: #721c24;
+    opacity: 0.5; /* Just reduce opacity */
+}

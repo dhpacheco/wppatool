@@ -117,7 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
         nextImageBtn.addEventListener('click', nextImage);
         zoomInBtn.addEventListener('click', zoomIn);
         zoomOutBtn.addEventListener('click', zoomOut);
-        saveAnnotationsBtn.addEventListener('click', saveYoloAnnotations);
+        saveAnnotationsBtn.addEventListener('click', saveAllAnnotations);
         saveCropsBtn.addEventListener('click', saveCrops);
         deleteBtn.addEventListener('click', deleteSelectedAnnotation);
         drawModeBtn.addEventListener('click', toggleDrawMode);
@@ -1152,71 +1152,207 @@ document.addEventListener('DOMContentLoaded', () => {
             return null;
         }
     }
+// --- Helper Functions for Saving ---
 
-    async function saveYoloAnnotations() {
+    // (formatYoloLine function already exists)
+
+    function escapeXml(unsafe) {
+        // Escapa caracteres especiais para XML
+        if (typeof unsafe !== 'string') return unsafe;
+        return unsafe.replace(/[<>&'"]/g, function (c) {
+            switch (c) {
+                case '<': return '&lt;';
+                case '>': return '&gt;';
+                case '&': return '&amp;';
+                case '\'': return '&apos;';
+                case '"': return '&quot;';
+            }
+            return c; // Should not be reached with this regex
+        });
+    }
+
+    function createPascalVocXml(imgFilename, imgWidth, imgHeight, boxes) {
+        // Cria o conteúdo de um arquivo XML no formato Pascal VOC
+        let xml = `<annotation>\n`;
+        xml += `\t<folder>unknown</folder>\n`;
+        xml += `\t<filename>${escapeXml(imgFilename)}</filename>\n`;
+        // Poderia adicionar <path> se disponível, mas é complexo no cliente
+        xml += `\t<source>\n\t\t<database>Unknown</database>\n\t</source>\n`;
+        xml += `\t<size>\n`;
+        xml += `\t\t<width>${Math.round(imgWidth)}</width>\n`;
+        xml += `\t\t<height>${Math.round(imgHeight)}</height>\n`;
+        xml += `\t\t<depth>3</depth>\n`; // Assume 3 canais (RGB)
+        xml += `\t</size>\n`;
+        xml += `\t<segmented>0</segmented>\n`; // Assume não segmentado
+
+        boxes.forEach(box => {
+            // Garante ordem e arredonda coordenadas
+            const xmin = Math.round(Math.min(box.x1, box.x2));
+            const ymin = Math.round(Math.min(box.y1, box.y2));
+            const xmax = Math.round(Math.max(box.x1, box.x2));
+            const ymax = Math.round(Math.max(box.y1, box.y2));
+            const label = escapeXml(box.label);
+
+             // Pula caixas inválidas (sem tamanho)
+             if (xmin >= xmax || ymin >= ymax) {
+                 console.warn(`Pulando caixa inválida para '${label}' no XML VOC de ${imgFilename}`);
+                 return; // Continua para o próximo box
+             }
+
+            xml += `\t<object>\n`;
+            xml += `\t\t<name>${label}</name>\n`;
+            xml += `\t\t<pose>Unspecified</pose>\n`;
+            xml += `\t\t<truncated>0</truncated>\n`;
+            xml += `\t\t<difficult>0</difficult>\n`;
+            xml += `\t\t<bndbox>\n`;
+            xml += `\t\t\t<xmin>${xmin}</xmin>\n`;
+            xml += `\t\t\t<ymin>${ymin}</ymin>\n`;
+            xml += `\t\t\t<xmax>${xmax}</xmax>\n`;
+            xml += `\t\t\t<ymax>${ymax}</ymax>\n`;
+            xml += `\t\t</bndbox>\n`;
+            xml += `\t</object>\n`;
+        });
+
+        xml += `</annotation>`;
+        return xml;
+    }
+
+    // Função Principal para Salvar Anotações (Formatos YOLO e VOC)
+    async function saveAllAnnotations() { // Nome da função alterado
         const hasAnyAnns = Object.values(annotations).some(anns => anns?.length > 0);
         if (!hasAnyAnns) {
             alert("Não há anotações para salvar."); return;
         }
         const useZip = typeof JSZip !== 'undefined';
-        if (!useZip && !confirm("JSZip não encontrado. Anotações serão baixadas individualmente. Continuar?")) {
+        if (!useZip && !confirm("JSZip não encontrado. Anotações (YOLO e VOC) serão baixadas individualmente. Continuar?")) {
             setStatus("Salvar cancelado."); return;
         }
 
-        setStatus("Preparando anotações YOLO...");
+        setStatus("Preparando anotações (YOLO & VOC)..."); // Mensagem atualizada
         const sortedClasses = Array.from(knownClasses).sort();
         if (sortedClasses.length === 0) {
             alert("Erro: Nenhuma classe definida."); setStatus("Erro: Sem classes."); return;
         }
-        const classesTxtContent = sortedClasses.join('\n');
-        const yoloFileContents = {};
-        const promises = [];
+        const classesTxtContent = sortedClasses.join('\n'); // Conteúdo para classes.txt (YOLO)
+
+        // Objetos para guardar conteúdo dos arquivos
+        const yoloFileContents = {}; // Para arquivos .txt (YOLO)
+        const vocFileContents = {};  // *** NOVO: Para arquivos .xml (VOC) ***
+
+        const promises = []; // Para esperar busca de dimensões
 
         for (const filename in annotations) {
             const boxes = annotations[filename];
             if (boxes?.length > 0) {
-                const baseFilename = filename.replace(/\.[^/.]+$/, "");
+                const baseFilename = filename.replace(/\.[^/.]+$/, ""); // Nome sem extensão
                 promises.push(
                     getImageDimensions(filename).then(dims => {
                         if (dims?.w > 0 && dims?.h > 0) {
-                            const yoloLines = boxes.map(box => formatYoloLine(dims.w, dims.h, box, sortedClasses)).filter(line => line !== null);
-                            if (yoloLines.length > 0) yoloFileContents[`${baseFilename}.txt`] = yoloLines.join('\n');
-                            else if (boxes.length > 0) console.warn(`Nenhuma linha YOLO válida gerada para ${filename}.`);
+                            // --- Gera YOLO ---
+                            const yoloLines = boxes.map(box => formatYoloLine(dims.w, dims.h, box, sortedClasses))
+                                               .filter(line => line !== null);
+                            if (yoloLines.length > 0) {
+                                yoloFileContents[`${baseFilename}.txt`] = yoloLines.join('\n');
+                            } else {
+                                console.warn(`Nenhuma linha YOLO válida gerada para ${filename}.`);
+                            }
+
+                            // --- *** NOVO: Gera VOC XML *** ---
+                            try {
+                                const vocXml = createPascalVocXml(filename, dims.w, dims.h, boxes);
+                                if (vocXml) { // Verifica se o XML foi gerado (pode falhar se boxes forem inválidos)
+                                     vocFileContents[`${baseFilename}.xml`] = vocXml;
+                                } else {
+                                     console.warn(`Nenhum conteúdo VOC XML gerado para ${filename} (talvez boxes inválidas).`);
+                                }
+                            } catch (xmlError) {
+                                 console.error(`Erro ao gerar XML VOC para ${filename}:`, xmlError);
+                                 setStatus(`Erro ao gerar XML para ${filename}.`);
+                            }
+                            // --- Fim da geração VOC ---
+
                         } else {
                             console.error(`Dimensões inválidas para ${filename}. Anotações não salvas.`);
                             setStatus(`Erro: Falha ao obter dimensões de ${filename}.`);
                         }
+                    }).catch(dimError => { // Captura erro do getImageDimensions também
+                         console.error(`Erro ao obter dimensões para ${filename}:`, dimError);
+                         setStatus(`Erro ao obter dimensões de ${filename}.`);
                     })
                 );
             }
+        } // Fim do loop for..in
+
+        // Espera todas as promessas (geração de conteúdo) terminarem
+        try {
+            await Promise.all(promises);
+        } catch (error) {
+            console.error("Erro processando anotações:", error);
+            setStatus("Erro ao processar anotações. Ver console.");
+            return;
         }
 
-        try { await Promise.all(promises); }
-        catch (error) { console.error("Erro processando anotações:", error); setStatus("Erro ao processar. Ver console."); return; }
-
-        if (Object.keys(yoloFileContents).length === 0 && !classesTxtContent) {
-             alert("Nenhuma anotação válida encontrada para salvar."); setStatus("Nenhuma anotação válida."); return;
+        // Verifica se algo foi realmente gerado
+        const hasYoloFiles = Object.keys(yoloFileContents).length > 0 || !!classesTxtContent;
+        const hasVocFiles = Object.keys(vocFileContents).length > 0;
+        if (!hasYoloFiles && !hasVocFiles) {
+             alert("Nenhuma anotação válida encontrada para salvar em nenhum formato.");
+             setStatus("Nenhuma anotação válida para salvar.");
+             return;
         }
 
+        // --- Lógica de Salvamento (ZIP ou Individual) ---
         if (useZip) {
-            setStatus("Criando ZIP YOLO...");
+            setStatus("Criando ZIP com anotações (YOLO & VOC)..."); // Mensagem atualizada
             const zip = new JSZip();
-            const folder = zip.folder("yolo_annotations");
-            if (classesTxtContent) folder.file("classes.txt", classesTxtContent);
-            for (const txtFilename in yoloFileContents) folder.file(txtFilename, yoloFileContents[txtFilename]);
+            const yoloFolder = zip.folder("yolo_annotations"); // Pasta para YOLO
+            const vocFolder = zip.folder("voc_annotations");   // Pasta para VOC
+
+            // Adiciona arquivos YOLO
+            if (classesTxtContent) yoloFolder.file("classes.txt", classesTxtContent);
+            for (const txtFilename in yoloFileContents) {
+                yoloFolder.file(txtFilename, yoloFileContents[txtFilename]);
+            }
+
+            // *** NOVO: Adiciona arquivos VOC ***
+            for (const xmlFilename in vocFileContents) {
+                vocFolder.file(xmlFilename, vocFileContents[xmlFilename]);
+            }
+
             try {
                 const content = await zip.generateAsync({ type: "blob" });
-                triggerDownload(content, "yolo_annotations.zip");
-                setStatus(`Anotações salvas em yolo_annotations.zip.`);
-            } catch (err) { console.error("Erro ZIP:", err); setStatus("Erro ao criar ZIP."); alert("Erro ao gerar ZIP."); }
+                triggerDownload(content, "image_annotations.zip"); // Nome do ZIP atualizado
+                setStatus(`Anotações salvas em image_annotations.zip (YOLO & VOC).`); // Mensagem atualizada
+            } catch (err) {
+                console.error("Erro ao criar ZIP:", err);
+                setStatus("Erro ao criar ZIP. Ver console.");
+                alert("Erro ao gerar ZIP.");
+            }
         } else {
-            setStatus("Iniciando downloads individuais YOLO...");
-            let count = 0;
-            if (classesTxtContent) { triggerDownload(new Blob([classesTxtContent], { type: 'text/plain' }), "classes.txt"); count++; }
-            for (const txtFilename in yoloFileContents) { triggerDownload(new Blob([yoloFileContents[txtFilename]], { type: 'text/plain' }), txtFilename); count++; }
-            setStatus(`Downloads individuais YOLO iniciados (${count}).`);
+            // Fallback: Downloads individuais
+            setStatus("Iniciando downloads individuais (YOLO & VOC)..."); // Mensagem atualizada
+            let yoloCount = 0;
+            let vocCount = 0;
+
+            // Download YOLO
+            if (classesTxtContent) {
+                triggerDownload(new Blob([classesTxtContent], { type: 'text/plain' }), "classes.txt");
+                yoloCount++;
+            }
+            for (const txtFilename in yoloFileContents) {
+                triggerDownload(new Blob([yoloFileContents[txtFilename]], { type: 'text/plain' }), txtFilename);
+                yoloCount++;
+            }
+
+            // *** NOVO: Download VOC ***
+            for (const xmlFilename in vocFileContents) {
+                triggerDownload(new Blob([vocFileContents[xmlFilename]], { type: 'application/xml' }), xmlFilename); // MIME type correto
+                vocCount++;
+            }
+
+            setStatus(`Downloads individuais iniciados (${yoloCount} YOLO, ${vocCount} VOC).`); // Mensagem atualizada
         }
-    }
+    } // Fim da função saveAllAnnotations
 
     async function saveCrops() {
         const currentFilename = imageFiles[currentImageIndex]?.name;
